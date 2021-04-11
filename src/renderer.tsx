@@ -85,9 +85,12 @@ const renderInstance = (type, node, props) => {
     return result;
 };
 
-export const render = async (jsx: any, targetNodeId?: string) => {
+export const render = async (jsx: any, targetNodeId?: string, options: { hydrate: boolean } = { hydrate: true }) => {
     const rootNode = await api.getInitialTree(targetNodeId);
     prepareToHydration(rootNode, undefined);
+
+    // Used to prevent react deleting nodes while "closing the container" (see return function for details)
+    let cleanupUnderWay = false;
 
     const HostConfig = {
         now: Date.now,
@@ -128,7 +131,16 @@ export const render = async (jsx: any, targetNodeId?: string) => {
             appendToContainer(parentNode, childNode);
         },
         insertInContainerBefore: () => {},
-        removeChildFromContainer: () => {},
+        removeChildFromContainer: (container, child) => {
+            if (container && container.type === 'INSTANCE') {
+                return;
+            }
+
+            if (cleanupUnderWay) {
+                return;
+            }
+            remove(child);
+        },
         prepareUpdate: () => {
             return true;
         },
@@ -143,11 +155,32 @@ export const render = async (jsx: any, targetNodeId?: string) => {
                 setTextChildren(textInstance.parent, newText);
             }
         },
-        removeChild: (parentNode, childNode) => {
+        removeChild: (parentNode, child) => {
             if (parentNode && parentNode.type === 'INSTANCE') {
                 return;
             }
-            remove(childNode);
+
+            if (cleanupUnderWay) {
+                return;
+            }
+            remove(child);
+        },
+        canHydrateTextInstance: (textInstance, text) => {
+            if (text === '' || textInstance.type !== 'TEXT_CONTAINER') {
+                return null;
+            }
+            return textInstance;
+        },
+        canHydrateSuspenseInstance(instance) {
+            if (instance.nodeType !== 'COMMENT_NODE') {
+                return null;
+            }
+
+            return instance;
+        },
+
+        hydrateTextInstance: (textInstance, text, internalInstanceHandle) => {
+            return textInstance.value === text;
         },
         canHydrateInstance: (instance, type, props) => {
             if (!checkInstanceMatchType(instance, type) || (instance.parent && instance.parent.type === 'INSTANCE')) {
@@ -181,6 +214,21 @@ export const render = async (jsx: any, targetNodeId?: string) => {
         rendererPackageName: 'react-figma'
     });
 
-    const container = reconciler.createContainer(rootNode, true, true);
+    const container = reconciler.createContainer(rootNode, true, options.hydrate);
     reconciler.updateContainer(jsx, container);
+
+    return {
+        /**
+         * The naming is probably wrong here, and it's possibly using the wrong api.
+         *
+         * This is used to stop reconciliation on the target container.
+         *
+         * It was added to support a use case where the render function is being called on figma nodes
+         * "on demand" (driven by plugin ui).
+         */
+        closeContainer: () => {
+            cleanupUnderWay = true;
+            reconciler.updateContainer(null, container);
+        }
+    };
 };

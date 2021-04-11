@@ -4,6 +4,7 @@ import { baseNodeMixin } from '../mixins/baseNodeMixin';
 import { exportMixin } from '../mixins/exportMixin';
 import { blendMixin } from '../mixins/blendMixin';
 import { frameMixin } from '../mixins/frameMixin';
+import { autoLayoutMixin } from '../mixins/autoLayoutMixin';
 import { sceneNodeMixin } from '../mixins/sceneNodeMixin';
 
 const createNewComponentSet = () => {
@@ -12,7 +13,7 @@ const createNewComponentSet = () => {
     return figma.combineAsVariants([component], figma.currentPage);
 };
 
-export const componentset = node => props => {
+export const component_set = node => props => {
     const componentSetNode = node || props.node || createNewComponentSet();
 
     saveStyleMixin(componentSetNode)(props);
@@ -20,6 +21,7 @@ export const componentset = node => props => {
     layoutMixin(componentSetNode)(props);
     exportMixin(componentSetNode)(props);
     blendMixin(componentSetNode)(props);
+    autoLayoutMixin(componentSetNode)(props);
 
     frameMixin(componentSetNode)(props);
     sceneNodeMixin(componentSetNode)(props);

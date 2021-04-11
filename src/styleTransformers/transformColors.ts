@@ -77,6 +77,11 @@ export const colorToPaint = (color: Color): Paint => {
             }))
         };
     }
-    const { a: alpha, ...rbg } = colorToRGBA(color);
-    return { type: 'SOLID', color: rbg, opacity: alpha };
+    try {
+        const { a: alpha, ...rbg } = colorToRGBA(color);
+        return { type: 'SOLID', color: rbg, opacity: alpha };
+    } catch (error) {
+        console.log(error);
+        return { type: 'SOLID', color: { r: 1, g: 0, b: 0 }, opacity: 1 };
+    }
 };
